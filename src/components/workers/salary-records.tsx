@@ -637,51 +637,53 @@ export function SalaryRecords() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                            <TableHead>{t('date')}</TableHead>
-                            <TableHead>{t('workerName')}</TableHead>
-                            <TableHead>{t('paymentType')}</TableHead>
-                            <TableHead>{t('details')}</TableHead>
-                            <TableHead className="text-right">{t('amount')}</TableHead>
-                            <TableHead className="text-right">{t('actions')}</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredTransactions.map((t) => (
-                            <TableRow key={t.id}>
-                                <TableCell>{format(new Date(t.date), "PPP")}</TableCell>
-                                <TableCell className="font-medium">{t.workerName}</TableCell>
-                                <TableCell>
-                                    <Badge variant={getBadgeVariant(t.type)}>
-                                        {t.type.replace('_', ' ')}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    {t.notes || 'N/A'}
-                                </TableCell>
-                                <TableCell className="text-right">PKR {t.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                                <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" onClick={() => setViewingTransaction(t)}>
-                                        <Icons.search className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" onClick={() => setEditingTransaction(t)}>
-                                        <Icons.settings className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => openDeleteDialog(t)}>
-                                        <Icons.trash className="h-4 w-4" />
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                            ))}
-                            {filteredTransactions.length === 0 && (
+                    <ScrollArea className="h-[600px]">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center h-24">{t('noTransactionsFound')}</TableCell>
+                                <TableHead>{t('date')}</TableHead>
+                                <TableHead>{t('workerName')}</TableHead>
+                                <TableHead>{t('paymentType')}</TableHead>
+                                <TableHead>{t('details')}</TableHead>
+                                <TableHead className="text-right">{t('amount')}</TableHead>
+                                <TableHead className="text-right">{t('actions')}</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredTransactions.map((t) => (
+                                <TableRow key={t.id}>
+                                    <TableCell>{format(new Date(t.date), "PPP")}</TableCell>
+                                    <TableCell className="font-medium">{t.workerName}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={getBadgeVariant(t.type)}>
+                                            {t.type.replace('_', ' ')}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        {t.notes || 'N/A'}
+                                    </TableCell>
+                                    <TableCell className="text-right">PKR {t.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button variant="ghost" size="icon" onClick={() => setViewingTransaction(t)}>
+                                            <Icons.search className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" onClick={() => setEditingTransaction(t)}>
+                                            <Icons.settings className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => openDeleteDialog(t)}>
+                                            <Icons.trash className="h-4 w-4" />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                                ))}
+                                {filteredTransactions.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center h-24">{t('noTransactionsFound')}</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
                 </CardContent>
             </Card>
         </div>
