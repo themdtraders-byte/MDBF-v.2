@@ -29,7 +29,7 @@ type Sale = { customerId: string, invoiceNumber: string, invoiceDate: string, gr
 type InventoryItem = { id: string; name: string };
 interface RowRange { start: number | null; end: number | null; }
 
-export function CustomerDetails({ customer }: CustomerDetailsProps) {
+export function CustomerDetails({ customer }: { customer: Customer }) {
     const { t } = useLanguage();
     const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
     const [inventory, setInventory] = useState<InventoryItem[]>([]);

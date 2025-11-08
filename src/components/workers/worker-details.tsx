@@ -53,6 +53,7 @@ export function WorkerDetails({ worker }: WorkerDetailsProps) {
     const { t } = useLanguage();
     const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
     const [allTransactions, setAllTransactions] = useState<any[]>([]);
+    const [inventory, setInventory] = useState<Item[]>([]);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [rowRange, setRowRange] = useState<RowRange>({ start: null, end: null });
 
@@ -65,6 +66,9 @@ export function WorkerDetails({ worker }: WorkerDetailsProps) {
                 setBusinessProfile(activeProfile || null);
             }
             
+            const inventoryItems: Item[] = await dbLoad("inventory");
+            setInventory(inventoryItems);
+
             const salaryTxs: SalaryTransaction[] = (await dbLoad("salary-transactions")).filter(s => s.workerId === worker.id);
             const allProductionHistory: ProductionBatch[] = await dbLoad("production-history");
             const workerAttendance: AttendanceRecord[] = (await dbLoad("attendance")).filter(a => a.workerId === worker.id);
@@ -87,12 +91,16 @@ export function WorkerDetails({ worker }: WorkerDetailsProps) {
                 const productionEarnings = allProductionHistory.flatMap(batch => 
                     (batch.laborCosts || [])
                         .filter(lc => lc.workerId === worker.id)
-                        .map(lc => ({
-                            date: batch.productionDate,
-                            description: `Work on batch ${batch.batchCode}`,
-                            debit: 0,
-                            credit: lc.cost,
-                        }))
+                        .map(lc => {
+                            const finishedGood = batch.finishedGoods[0]; // Assuming one FG per batch for simplicity
+                            const itemName = inventoryItems.find(i => i.id === finishedGood?.itemId)?.name || 'Product';
+                            return {
+                                date: batch.productionDate,
+                                description: `Work on batch ${batch.batchCode}: Produced ${itemName} (x${lc.quantity})`,
+                                debit: 0,
+                                credit: lc.cost,
+                            }
+                        })
                 );
                 txs.push(...productionEarnings);
             } else { 
