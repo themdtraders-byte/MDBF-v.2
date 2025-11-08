@@ -252,7 +252,7 @@ export function Invoice({
                   </div>
               </header>
 
-              <main className="max-h-[400px] overflow-y-auto print:max-h-full print:overflow-visible">
+              <main className="max-h-[400px] overflow-y-auto print:max-h-none print:overflow-visible">
                   <Table>
                       <TableHeader>
                           <TableRow>
