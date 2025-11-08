@@ -140,7 +140,7 @@ export function Invoice({
     tableContainer.style.maxHeight = 'none';
     tableContainer.style.overflowY = 'visible';
 
-    toPng(node, { cacheBust: true, pixelRatio: 2 })
+    toPng(node, { cacheBust: true, pixelRatio: 2, skipFonts: true })
       .then((dataUrl) => {
         const link = document.createElement('a');
         link.download = `${reference.type.replace(/ /g, '-')}-${reference.number}.png`;
