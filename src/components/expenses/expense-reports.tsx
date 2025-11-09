@@ -38,7 +38,9 @@ type Expense = {
     id: string;
     categoryId: string;
     itemId?: string;
-    amount: number;
+    amount: number; // This represents total bill for home profiles
+    totalBill?: number;
+    amountPaid?: number;
     date: string;
     notes?: string;
     reference?: string;
@@ -108,7 +110,7 @@ export function ExpenseReports() {
   
   const categoryTotals = categories.map((cat, index) => ({
     name: cat.name,
-    value: expenses.filter(e => e.categoryId === cat.id).reduce((sum, e) => sum + e.amount, 0),
+    value: expenses.filter(e => e.categoryId === cat.id).reduce((sum, e) => sum + (e.totalBill || e.amount), 0),
     fill: COLORS[index % COLORS.length]
   })).filter(d => d.value > 0);
   
@@ -189,7 +191,7 @@ export function ExpenseReports() {
                                 <TableCell><Badge variant="outline">{getCategoryName(expense.categoryId)}</Badge></TableCell>
                                 <TableCell>{getItemName(expense.categoryId, expense.itemId)}</TableCell>
                                 <TableCell>{expense.notes || 'N/A'}</TableCell>
-                                <TableCell className="text-right font-semibold text-destructive">PKR {expense.amount.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-semibold text-destructive">PKR {(expense.totalBill || expense.amount).toFixed(2)}</TableCell>
                                 <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" onClick={() => setViewingExpense(expense)}>
                                         <Icons.search className="h-4 w-4" />

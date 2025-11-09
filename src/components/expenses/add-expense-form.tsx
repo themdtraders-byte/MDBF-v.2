@@ -23,7 +23,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -35,23 +35,36 @@ import { dbLoad, dbSave } from "@/lib/db";
 import { CreatableSelect } from "../ui/creatable-select";
 import { X, ImageIcon } from "lucide-react";
 import Image from "next/image";
+import { FormattedCurrency } from "../ui/formatted-currency";
+import { Separator } from "../ui/separator";
 
 const formSchema = z.object({
   categoryId: z.string().min(1, "Expense category is required."),
   itemId: z.string().optional(),
   date: z.date(),
-  amount: z.number().min(0.01, "Amount must be greater than 0."),
-  paymentAccountId: z.string().min(1, "Payment account is required."),
+  totalBill: z.number().min(0.01, "Total bill must be greater than 0."),
+  amountPaid: z.number().min(0, "Amount paid cannot be negative."),
+  paymentAccountId: z.string().optional(),
   reference: z.string().optional(),
   notes: z.string().optional(),
   attachments: z.array(z.string()).optional(),
   shopId: z.string().optional(),
+}).refine(data => {
+  // If an amount is paid, a payment account must be selected
+  if (data.amountPaid > 0) {
+    return !!data.paymentAccountId && data.paymentAccountId.length > 0;
+  }
+  return true;
+}, {
+  message: "Please select an account to pay from.",
+  path: ["paymentAccountId"],
 });
+
 
 type ExpenseFormValues = z.infer<typeof formSchema>;
 type Account = { id: string; name: string; balance: number; usageCount?: number };
 type ExpenseCategory = { id: string; name: string; usageCount?: number; items?: {id: string; name: string}[] };
-type Shop = { id: string; name: string };
+type Shop = { id: string; name: string; balance: number };
 
 interface AddExpenseFormProps {
     expenseToEdit?: ExpenseFormValues & { id: string, date: string | Date };
@@ -100,7 +113,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   
   const fetchShops = React.useCallback(async () => {
     if (isHomeProfile) {
-      const storedShops: Shop[] = await dbLoad("suppliers"); // Home profile shops are stored in suppliers table
+      const storedShops: Shop[] = await dbLoad("suppliers"); 
       setShops(storedShops);
     }
   }, [isHomeProfile]);
@@ -112,7 +125,6 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   }, [fetchAccounts, fetchCategories]);
   
   useEffect(() => {
-    // Determine if it's a home profile first
     const activeAccount = localStorage.getItem('dukaanxp-active-account');
     if (activeAccount) {
         try {
@@ -134,6 +146,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
     resolver: zodResolver(formSchema),
     defaultValues: isEditMode && expenseToEdit ? {
         ...expenseToEdit,
+        totalBill: (expenseToEdit as any).amount, // Map old 'amount' to 'totalBill'
         date: new Date(expenseToEdit.date),
         notes: expenseToEdit.notes || '',
         reference: expenseToEdit.reference || '',
@@ -142,7 +155,8 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
         itemId: expenseToEdit.itemId || '',
     } : {
       date: new Date(),
-      amount: 0,
+      totalBill: 0,
+      amountPaid: 0,
       notes: "",
       reference: "",
       attachments: [],
@@ -159,6 +173,9 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
 
   const attachments = form.watch("attachments") || [];
   const selectedCategoryId = form.watch("categoryId");
+  const totalBill = form.watch("totalBill") || 0;
+  const amountPaid = form.watch("amountPaid") || 0;
+  const remainingBalance = totalBill - amountPaid;
 
   const handleCreateCategory = async (categoryName: string) => {
     const dbKey = getCategoryDbKey();
@@ -228,6 +245,8 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
       const expenseData = {
           ...data,
           date: data.date.toISOString(),
+          // The main 'amount' for an expense record is the total bill value
+          amount: data.totalBill, 
       };
 
       if(isEditMode) {
@@ -238,13 +257,15 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
       } else {
         existingExpenses.push({ id: `EXP-${Date.now()}`, ...expenseData });
         
-        const currentAccounts: Account[] = await dbLoad("accounts");
-        const accountIndex = currentAccounts.findIndex(a => a.id === data.paymentAccountId);
-        if(accountIndex > -1){
-            currentAccounts[accountIndex].balance -= data.amount;
-            currentAccounts[accountIndex].usageCount = (currentAccounts[accountIndex].usageCount || 0) + 1;
-            await dbSave("accounts", currentAccounts);
-            fetchAccounts();
+        if (data.amountPaid > 0 && data.paymentAccountId) {
+            const currentAccounts: Account[] = await dbLoad("accounts");
+            const accountIndex = currentAccounts.findIndex(a => a.id === data.paymentAccountId);
+            if(accountIndex > -1){
+                currentAccounts[accountIndex].balance -= data.amountPaid;
+                currentAccounts[accountIndex].usageCount = (currentAccounts[accountIndex].usageCount || 0) + 1;
+                await dbSave("accounts", currentAccounts);
+                fetchAccounts();
+            }
         }
 
         const dbKey = getCategoryDbKey();
@@ -256,14 +277,14 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
         }
 
         if (isHomeProfile && data.shopId && data.shopId !== 'none') {
-            const suppliers = await dbLoad("suppliers"); // Shops are stored in suppliers table
+            const suppliers: Shop[] = await dbLoad("suppliers");
             const supplierIndex = suppliers.findIndex(s => s.id === data.shopId);
             if(supplierIndex > -1) {
-                suppliers[supplierIndex].balance -= data.amount; // Assuming expense means we paid, so supplier balance reduces if it was a payable
+                // The remaining balance is what we owe the shop
+                suppliers[supplierIndex].balance += (data.totalBill - data.amountPaid);
                 await dbSave("suppliers", suppliers);
             }
         }
-
       }
 
       await dbSave("expenses", existingExpenses);
@@ -278,7 +299,8 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
       } else {
         form.reset({
             date: new Date(),
-            amount: 0,
+            totalBill: 0,
+            amountPaid: 0,
             categoryId: "",
             paymentAccountId: "",
             reference: "",
@@ -391,25 +413,73 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                         </FormItem>
                     )}
                 />
-                <FormField
-                    control={form.control}
-                    name="amount"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>{t('amount')}</FormLabel>
-                        <FormControl>
-                           <div className="relative">
-                               <Icons.dollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                               <Input type="number" placeholder="0.00" {...field}
+                 {isHomeProfile ? (
+                    <FormField
+                        control={form.control}
+                        name="totalBill"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Total Bill / Price</FormLabel>
+                            <FormControl>
+                            <Input type="number" placeholder="0.00" {...field}
                                 value={field.value === 0 ? '' : field.value}
-                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)} className="pl-10" />
-                           </div>
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                ) : (
+                    <FormField
+                        control={form.control}
+                        name="totalBill" // For business profile, this is just 'amount'
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>{t('amount')}</FormLabel>
+                            <FormControl>
+                            <div className="relative">
+                                <Icons.dollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                <Input type="number" placeholder="0.00" {...field}
+                                    value={field.value === 0 ? '' : field.value}
+                                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)} className="pl-10" />
+                            </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
              </div>
+
+              {isHomeProfile && (
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h3 className="text-md font-medium">Payment Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="amountPaid"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Amount Paid Now</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex items-center justify-center text-lg font-semibold">
+                      <p>Remaining: <FormattedCurrency amount={remainingBalance} className={cn(remainingBalance > 0 && "text-destructive")} /></p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <FormField
                     control={form.control}
@@ -417,7 +487,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                     render={({ field }) => (
                         <FormItem>
                         <FormLabel>{t('paymentFrom')}</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
                             <FormControl>
                             <SelectTrigger>
                                 <SelectValue placeholder={t('selectPaymentAccount')} />
@@ -510,7 +580,8 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                 {!isEditMode && 
                     <Button variant="outline" type="button" onClick={() => form.reset({
                         date: new Date(),
-                        amount: 0,
+                        totalBill: 0,
+                        amountPaid: 0,
                         categoryId: "",
                         paymentAccountId: "",
                     })}>

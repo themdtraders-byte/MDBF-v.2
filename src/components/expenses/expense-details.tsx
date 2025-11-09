@@ -15,6 +15,8 @@ type Expense = {
     itemId?: string;
     date: string;
     amount: number;
+    totalBill?: number;
+    amountPaid?: number;
     paymentAccountId?: string;
     notes?: string;
     reference?: string;
@@ -65,20 +67,26 @@ export function ExpenseDetails({ expense }: ExpenseDetailsProps) {
     }
 
     const itemName = getItemName(expense.categoryId, expense.itemId);
+    const totalAmount = expense.totalBill || expense.amount;
     
     const tableHeaders = ['Description', 'Category', 'Amount'];
     const tableRows = [
         [
             `${itemName ? `${itemName} - ` : ''}${expense.notes || 'General Expense'}`,
             category?.name || 'Uncategorized',
-            `PKR ${expense.amount.toFixed(2)}`
+            `PKR ${totalAmount.toFixed(2)}`
         ]
     ];
 
     const summaryDetails = [
-        { label: "grandTotal:", value: `PKR ${expense.amount.toFixed(2)}`, isGrand: true },
+        { label: "grandTotal:", value: `PKR ${totalAmount.toFixed(2)}`, isGrand: true },
         { label: "Paid From:", value: account?.name || 'N/A' },
     ];
+    
+    if(expense.amountPaid !== undefined) {
+         summaryDetails.push({ label: "Amount Paid:", value: `PKR ${expense.amountPaid.toFixed(2)}` });
+         summaryDetails.push({ label: "Balance Due:", value: `PKR ${(totalAmount - expense.amountPaid).toFixed(2)}`, isBalance: true, className: "text-destructive" });
+    }
 
     return (
        <div>
