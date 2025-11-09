@@ -44,11 +44,13 @@ const formSchema = z.object({
   reference: z.string().optional(),
   notes: z.string().optional(),
   attachments: z.array(z.string()).optional(),
+  shopId: z.string().optional(),
 });
 
 type ExpenseFormValues = z.infer<typeof formSchema>;
 type Account = { id: string; name: string; balance: number; usageCount?: number };
 type ExpenseCategory = { id: string; name: string; usageCount?: number };
+type Shop = { id: string; name: string };
 
 interface AddExpenseFormProps {
     expenseToEdit?: ExpenseFormValues & { id: string, date: string | Date };
@@ -60,35 +62,48 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [isHomeProfile, setIsHomeProfile] = useState(false);
   const isEditMode = !!expenseToEdit;
 
-  const getCategoryDbKey = () => {
+  const getCategoryDbKey = React.useCallback(() => {
     if (typeof window === 'undefined') return 'business-expense-categories';
     const activeAccount = localStorage.getItem('dukaanxp-active-account');
     if (activeAccount) {
       const type = JSON.parse(activeAccount).type;
+      setIsHomeProfile(type === 'Home');
       return type === 'Home' ? 'home-expense-categories' : 'business-expense-categories';
     }
+    setIsHomeProfile(false);
     return 'business-expense-categories';
-  }
+  }, []);
 
   const fetchCategories = React.useCallback(async () => {
     const dbKey = getCategoryDbKey();
     const storedCategories: ExpenseCategory[] = await dbLoad(dbKey);
     storedCategories.sort((a,b) => (b.usageCount || 0) - (a.usageCount || 0) || a.name.localeCompare(b.name));
     setExpenseCategories(storedCategories);
-  }, []);
+  }, [getCategoryDbKey]);
 
   const fetchAccounts = React.useCallback(async () => {
     const storedAccounts: Account[] = await dbLoad("accounts");
     storedAccounts.sort((a,b) => (b.usageCount || 0) - (a.usageCount || 0) || a.name.localeCompare(b.name));
     setAccounts(storedAccounts);
   }, []);
+  
+  const fetchShops = React.useCallback(async () => {
+    if (isHomeProfile) {
+      const storedShops: Shop[] = await dbLoad("shops");
+      setShops(storedShops);
+    }
+  }, [isHomeProfile]);
+
 
   useEffect(() => {
     fetchAccounts();
     fetchCategories();
-  }, [fetchAccounts, fetchCategories]);
+    fetchShops();
+  }, [fetchAccounts, fetchCategories, fetchShops]);
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(formSchema),
@@ -98,12 +113,14 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
         notes: expenseToEdit.notes || '',
         reference: expenseToEdit.reference || '',
         attachments: expenseToEdit.attachments || [],
+        shopId: expenseToEdit.shopId || '',
     } : {
       date: new Date(),
       amount: 0,
       notes: "",
       reference: "",
       attachments: [],
+      shopId: '',
     },
   });
   
@@ -205,6 +222,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
             reference: "",
             notes: "",
             attachments: [],
+            shopId: '',
         });
       }
     } catch (error) {
@@ -217,6 +235,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   };
   
   const categoryOptions = expenseCategories.map(cat => ({ value: cat.id, label: cat.name }));
+  const shopOptions = shops.map(shop => ({ value: shop.id, label: shop.name }));
 
   return (
     <Card className={cn(isEditMode && "border-0 shadow-none")}>
@@ -325,6 +344,31 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                     )}
                 />
              </div>
+             {isHomeProfile && (
+                <FormField
+                    control={form.control}
+                    name="shopId"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Shop (Optional)</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a shop" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="">None</SelectItem>
+                                    {shopOptions.map(shop => (
+                                        <SelectItem key={shop.value} value={shop.value}>{shop.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+             )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <FormField
                     control={form.control}

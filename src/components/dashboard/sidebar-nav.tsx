@@ -40,6 +40,7 @@ const businessNavItems = [
 const homeNavItems = [
     { href: "/", icon: Icons.dashboard, label: "dashboard" },
     { href: "/expenses", icon: Icons.expenses, label: "expenses" },
+    { href: "/shops", icon: Icons.store, label: "Shops" },
     { href: "/reports", icon: Icons.reports, label: "reports" },
     { href: "/trash", icon: Icons.trash, label: "trash" },
     { href: "/settings", icon: Icons.settings, label: "settings" },
@@ -115,7 +116,7 @@ export function SidebarNav() {
               >
                 <Link href={item.href}>
                   <item.icon />
-                  <span>{t(item.label as keyof any)}</span>
+                  <span>{item.label === 'Shops' ? item.label : t(item.label as keyof any)}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
