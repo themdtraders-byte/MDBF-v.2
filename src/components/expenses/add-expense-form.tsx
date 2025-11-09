@@ -71,9 +71,15 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
     if (typeof window === 'undefined') return 'business-expense-categories';
     const activeAccount = localStorage.getItem('dukaanxp-active-account');
     if (activeAccount) {
-      const type = JSON.parse(activeAccount).type;
-      setIsHomeProfile(type === 'Home');
-      return type === 'Home' ? 'home-expense-categories' : 'business-expense-categories';
+      try {
+        const type = JSON.parse(activeAccount).type;
+        const isHome = type === 'Home';
+        setIsHomeProfile(isHome);
+        return isHome ? 'home-expense-categories' : 'business-expense-categories';
+      } catch (e) {
+        setIsHomeProfile(false);
+        return 'business-expense-categories';
+      }
     }
     setIsHomeProfile(false);
     return 'business-expense-categories';
@@ -94,7 +100,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   
   const fetchShops = React.useCallback(async () => {
     if (isHomeProfile) {
-      const storedShops: Shop[] = await dbLoad("suppliers");
+      const storedShops: Shop[] = await dbLoad("suppliers"); // Home profile shops are stored in suppliers table
       setShops(storedShops);
     }
   }, [isHomeProfile]);
@@ -104,10 +110,25 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
     fetchAccounts();
     fetchCategories();
   }, [fetchAccounts, fetchCategories]);
+  
+  useEffect(() => {
+    // Determine if it's a home profile first
+    const activeAccount = localStorage.getItem('dukaanxp-active-account');
+    if (activeAccount) {
+        try {
+            const type = JSON.parse(activeAccount).type;
+            if (type === 'Home') {
+                setIsHomeProfile(true);
+            }
+        } catch(e) {}
+    }
+  }, []);
 
   useEffect(() => {
-    fetchShops();
-  }, [fetchShops]);
+    if (isHomeProfile) {
+      fetchShops();
+    }
+  }, [isHomeProfile, fetchShops]);
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(formSchema),
@@ -235,10 +256,10 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
         }
 
         if (isHomeProfile && data.shopId && data.shopId !== 'none') {
-            const suppliers = await dbLoad("suppliers");
+            const suppliers = await dbLoad("suppliers"); // Shops are stored in suppliers table
             const supplierIndex = suppliers.findIndex(s => s.id === data.shopId);
             if(supplierIndex > -1) {
-                suppliers[supplierIndex].balance -= data.amount;
+                suppliers[supplierIndex].balance -= data.amount; // Assuming expense means we paid, so supplier balance reduces if it was a payable
                 await dbSave("suppliers", suppliers);
             }
         }

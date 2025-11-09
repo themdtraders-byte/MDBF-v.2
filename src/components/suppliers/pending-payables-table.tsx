@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -30,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useToast } from "@/hooks/use-toast";
 import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from "date-fns";
 import { DateRange } from "react-day-picker";
+import { FormattedCurrency } from "../ui/formatted-currency";
 
 type Supplier = {
     id: string;
@@ -44,7 +44,11 @@ type Account = {
     balance: number;
 }
 
-export function PendingPayablesTable() {
+interface PendingPayablesTableProps {
+  isShopProfile?: boolean;
+}
+
+export function PendingPayablesTable({ isShopProfile = false }: PendingPayablesTableProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [allPayableSuppliers, setAllPayableSuppliers] = useState<Supplier[]>([]);
@@ -136,7 +140,7 @@ export function PendingPayablesTable() {
 
         toast({
             title: "Payment Made",
-            description: `PKR ${amountPaid} paid to ${payingSupplier.name}.`,
+            description: `PKR ${amountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} paid to ${payingSupplier.name}.`,
         });
 
         fetchSuppliersAndAccounts();
@@ -160,7 +164,7 @@ export function PendingPayablesTable() {
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
             <div>
                 <CardTitle>{t("pendingPayables")}</CardTitle>
-                <CardDescription>Suppliers with a pending balance to be paid.</CardDescription>
+                <CardDescription>{isShopProfile ? 'Shops with a pending balance.' : 'Suppliers with a pending balance to be paid.'}</CardDescription>
             </div>
             <DateRangePicker date={dateRange} setDate={setDateRange} />
         </div>
@@ -169,7 +173,7 @@ export function PendingPayablesTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Supplier Name</TableHead>
+              <TableHead>{isShopProfile ? 'Shop Name' : 'Supplier Name'}</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead className="text-right">Balance Payable</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -180,7 +184,9 @@ export function PendingPayablesTable() {
               <TableRow key={supplier.id}>
                 <TableCell className="font-medium">{supplier.name}</TableCell>
                 <TableCell>{supplier.contact}</TableCell>
-                <TableCell className="text-right text-destructive font-semibold">PKR {supplier.balance.toFixed(2)}</TableCell>
+                <TableCell className="text-right text-destructive font-semibold">
+                    <FormattedCurrency amount={supplier.balance} />
+                </TableCell>
                 <TableCell className="text-right">
                     <Button variant="outline" size="sm" onClick={() => openPaymentDialog(supplier)}>
                         <Icons.paymentsMade className="mr-2 h-4 w-4" />
@@ -203,7 +209,7 @@ export function PendingPayablesTable() {
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Make Payment to {payingSupplier?.name}</DialogTitle>
-                <DialogDescription>Record a payment made to a supplier for an outstanding bill.</DialogDescription>
+                <DialogDescription>Record a payment made for an outstanding bill.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
                 <div className="space-y-2">

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -71,7 +70,11 @@ type SupplierType = {
     name: string;
 }
 
-export function SupplierListTable() {
+interface SupplierListTableProps {
+  isShopProfile?: boolean;
+}
+
+export function SupplierListTable({ isShopProfile = false }: SupplierListTableProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { searchTerm } = useSearch();
@@ -157,7 +160,7 @@ export function SupplierListTable() {
     setSuppliers(updatedSuppliers);
 
     toast({
-      title: 'Supplier Moved to Trash',
+      title: `${isShopProfile ? 'Shop' : 'Supplier'} Moved to Trash`,
       description: `${supplierToDelete.name} has been moved to the trash.`,
     });
     setSupplierToDelete(null);
@@ -179,17 +182,17 @@ export function SupplierListTable() {
     <>
     <Card>
       <CardHeader>
-        <CardTitle>{t("supplierList")}</CardTitle>
-        <CardDescription>{t('supplierListDescription')}</CardDescription>
+        <CardTitle>{isShopProfile ? 'Shop List' : t("supplierList")}</CardTitle>
+        <CardDescription>{isShopProfile ? 'View and manage all your shops.' : t('supplierListDescription')}</CardDescription>
         <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-between gap-2 pt-4">
             <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start">
                 <DateRangePicker date={dateRange} setDate={setDateRange} />
                 <Select onValueChange={setTypeFilter} defaultValue="all">
                     <SelectTrigger className="w-full sm:w-[180px]">
-                        <SelectValue placeholder={t('filterByType')} />
+                        <SelectValue placeholder={isShopProfile ? 'Filter by type' : t('filterByType')} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">{t('allTypes')}</SelectItem>
+                        <SelectItem value="all">{isShopProfile ? 'All Types' : t('allTypes')}</SelectItem>
                         {supplierTypes.map(type => (
                             <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
                         ))}
@@ -206,8 +209,8 @@ export function SupplierListTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t('supplierName')}</TableHead>
-              <TableHead>{t('type')}</TableHead>
+              <TableHead>{isShopProfile ? 'Shop Name' : t('supplierName')}</TableHead>
+              <TableHead>{isShopProfile ? 'Type' : t('type')}</TableHead>
               <TableHead>{t('contact')}</TableHead>
               <TableHead className="text-right">{t('balanceDue')}</TableHead>
               <TableHead className="text-center">{t('status')}</TableHead>
@@ -241,7 +244,7 @@ export function SupplierListTable() {
             ))}
              {filteredSuppliers.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24">No suppliers found.</TableCell>
+                    <TableCell colSpan={6} className="text-center h-24">No {isShopProfile ? 'shops' : 'suppliers'} found.</TableCell>
                 </TableRow>
             )}
           </TableBody>
@@ -252,19 +255,19 @@ export function SupplierListTable() {
     <Dialog open={!!editingSupplier} onOpenChange={(open) => !open && setEditingSupplier(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-                <DialogTitle>Edit Supplier</DialogTitle>
+                <DialogTitle>Edit {isShopProfile ? 'Shop' : 'Supplier'}</DialogTitle>
                 <DialogDescription>
-                    Update the details for this supplier.
+                    Update the details for this {isShopProfile ? 'shop' : 'supplier'}.
                 </DialogDescription>
             </DialogHeader>
-            {editingSupplier && <AddSupplierForm supplierToEdit={editingSupplier as any} onFinish={handleEditFinish} />}
+            {editingSupplier && <AddSupplierForm supplierToEdit={editingSupplier as any} onFinish={handleEditFinish} isShopProfile={isShopProfile} />}
         </DialogContent>
     </Dialog>
 
     <Dialog open={!!viewingSupplier} onOpenChange={(open) => !open && setViewingSupplier(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
             <DialogHeader>
-                <DialogTitle>Supplier Details</DialogTitle>
+                <DialogTitle>{isShopProfile ? 'Shop' : 'Supplier'} Details</DialogTitle>
             </DialogHeader>
             {viewingSupplier && <SupplierDetails supplier={viewingSupplier} />}
         </DialogContent>
@@ -275,7 +278,7 @@ export function SupplierListTable() {
             <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-                This action will move the supplier '{supplierToDelete?.name}' to the trash. You can restore them from the trash later. To confirm, please type <code className="font-mono text-base bg-muted px-2 py-1 rounded-md">{deleteConfirmationCode}</code> in the box below.
+                This action will move the {isShopProfile ? 'shop' : 'supplier'} '{supplierToDelete?.name}' to the trash. You can restore them from the trash later. To confirm, please type <code className="font-mono text-base bg-muted px-2 py-1 rounded-md">{deleteConfirmationCode}</code> in the box below.
             </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="py-4 space-y-2">

@@ -27,7 +27,7 @@ import { CreatableSelect } from "../ui/creatable-select";
 import { ImageIcon } from "lucide-react";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Supplier name is required."),
+  name: z.string().min(2, "Name is required."),
   company: z.string().optional(),
   typeId: z.string().optional(),
   contact: z.string().min(10, "A valid phone number is required."),
@@ -46,6 +46,7 @@ type SupplierType = { id: string; name: string; };
 interface AddSupplierFormProps {
     supplierToEdit?: SupplierFormValues & { id: string; balance: number; isQuickAdd?: boolean };
     onFinish: () => void;
+    isShopProfile?: boolean;
 }
 
 const generateSupplierId = async () => {
@@ -59,7 +60,7 @@ const generateSupplierId = async () => {
     return `SUPP-${String(lastId + 1).padStart(4, '0')}`;
 };
 
-export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormProps) {
+export function AddSupplierForm({ supplierToEdit, onFinish, isShopProfile = false }: AddSupplierFormProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [supplierTypes, setSupplierTypes] = useState<SupplierType[]>([]);
@@ -129,7 +130,7 @@ export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormPro
     existingTypes.push(newType);
     await dbSave("supplier-types", existingTypes);
     await fetchSupplierTypes();
-    toast({ title: "Supplier Type Created" });
+    toast({ title: `${isShopProfile ? 'Shop' : 'Supplier'} Type Created` });
     form.setValue('typeId', newType.id);
   };
 
@@ -144,8 +145,8 @@ export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormPro
       if (duplicate) {
         toast({
           variant: "destructive",
-          title: "Duplicate Supplier",
-          description: `A supplier with the name "${data.name}" already exists.`,
+          title: `Duplicate ${isShopProfile ? 'Shop' : 'Supplier'}`,
+          description: `A ${isShopProfile ? 'shop' : 'supplier'} with the name "${data.name}" already exists.`,
         });
         return;
       }
@@ -183,22 +184,22 @@ export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormPro
       await dbSave("suppliers", existingSuppliers);
       
       toast({
-        title: isEditMode ? "Supplier Updated" : "Supplier Added",
+        title: isEditMode ? `${isShopProfile ? 'Shop' : 'Supplier'} Updated` : `${isShopProfile ? 'Shop' : 'Supplier'} Added`,
         description: `${data.name} has been ${isEditMode ? 'updated' : 'added'}.`,
       });
       onFinish();
 
     } catch (error) {
-      console.error("Failed to save supplier:", error);
+      console.error(`Failed to save ${isShopProfile ? 'shop' : 'supplier'}:`, error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to save supplier. Please try again.",
+        description: `Failed to save ${isShopProfile ? 'shop' : 'supplier'}. Please try again.`,
       });
     }
   };
   
-  const cardTitle = isEditMode ? 'Edit Supplier' : t('addSupplier');
+  const cardTitle = isEditMode ? `Edit ${isShopProfile ? 'Shop' : 'Supplier'}` : `Add ${isShopProfile ? 'Shop' : 'Supplier'}`;
   const supplierTypeOptions = supplierTypes.map(st => ({ value: st.id, label: st.name }));
 
   return (
@@ -215,7 +216,7 @@ export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormPro
                     name="name"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Supplier Name</FormLabel>
+                        <FormLabel>{isShopProfile ? 'Shop' : 'Supplier'} Name</FormLabel>
                         <FormControl>
                             <Input placeholder="e.g., Prime Materials" {...field} />
                         </FormControl>
@@ -242,13 +243,13 @@ export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormPro
                 name="typeId"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Supplier Type (Optional)</FormLabel>
+                    <FormLabel>{isShopProfile ? 'Shop' : 'Supplier'} Type (Optional)</FormLabel>
                      <CreatableSelect
                         options={supplierTypeOptions}
                         value={field.value || ""}
                         onChange={(value) => form.setValue('typeId', value)}
                         onCreate={handleCreateSupplierType}
-                        placeholder="Select a supplier type"
+                        placeholder={`Select a ${isShopProfile ? 'shop' : 'supplier'} type`}
                      />
                     <FormMessage />
                     </FormItem>
@@ -341,7 +342,7 @@ export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormPro
                 />
              </div>
              <FormItem>
-                <FormLabel>Supplier Photo (Optional)</FormLabel>
+                <FormLabel>{isShopProfile ? 'Shop' : 'Supplier'} Photo (Optional)</FormLabel>
                 <FormControl>
                     <div className="flex items-center gap-4">
                         <label htmlFor="photo-upload" className="cursor-pointer border-2 border-dashed rounded-lg p-4 text-center w-full hover:bg-muted/50">
@@ -365,7 +366,7 @@ export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormPro
                     <FormItem>
                     <FormLabel>Notes / Remarks (Optional)</FormLabel>
                     <FormControl>
-                        <Textarea placeholder="Add any special notes about this supplier." {...field} value={field.value || ''}/>
+                        <Textarea placeholder={`Add any special notes about this ${isShopProfile ? 'shop' : 'supplier'}.`} {...field} value={field.value || ''}/>
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -373,7 +374,7 @@ export function AddSupplierForm({ supplierToEdit, onFinish }: AddSupplierFormPro
             />
              <CardFooter className="flex justify-end gap-2 p-0 pt-6">
                 <Button type="submit">
-                    <Icons.plus className="mr-2" /> {isEditMode ? "Save Changes" : "Save Supplier"}
+                    <Icons.plus className="mr-2" /> {isEditMode ? `Save ${isShopProfile ? 'Shop' : 'Supplier'}` : `Save ${isShopProfile ? 'Shop' : 'Supplier'}`}
                 </Button>
                 {!isEditMode && <Button variant="outline" type="button" onClick={() => form.reset()}>
                     <Icons.alertTriangle className="mr-2" /> Reset Form

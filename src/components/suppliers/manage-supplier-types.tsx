@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -70,7 +69,11 @@ type SupplierType = {
     description?: string;
 }
 
-export function ManageSupplierTypes() {
+interface ManageSupplierTypesProps {
+  isShopProfile?: boolean;
+}
+
+export function ManageSupplierTypes({ isShopProfile = false }: ManageSupplierTypesProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [types, setTypes] = useState<SupplierType[]>([]);
@@ -155,8 +158,8 @@ export function ManageSupplierTypes() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-            <CardTitle>{t("manageTypes")}</CardTitle>
-            <CardDescription>Create and manage your supplier types.</CardDescription>
+            <CardTitle>{isShopProfile ? 'Manage Shop Types' : t("manageTypes")}</CardTitle>
+            <CardDescription>Create and manage your {isShopProfile ? 'shop' : 'supplier'} types.</CardDescription>
         </div>
         <Button onClick={() => openDialog()}>
             <Icons.plus className="mr-2" /> Add New Type
@@ -188,7 +191,7 @@ export function ManageSupplierTypes() {
             ))}
              {types.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={3} className="text-center h-24">No supplier types found.</TableCell>
+                    <TableCell colSpan={3} className="text-center h-24">No {isShopProfile ? 'shop' : 'supplier'} types found.</TableCell>
                 </TableRow>
             )}
           </TableBody>
@@ -199,9 +202,9 @@ export function ManageSupplierTypes() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingType ? 'Edit' : 'Add'} Supplier Type</DialogTitle>
+            <DialogTitle>{editingType ? 'Edit' : 'Add'} {isShopProfile ? 'Shop' : 'Supplier'} Type</DialogTitle>
             <DialogDescription>
-              {editingType ? 'Update the details for this supplier type.' : 'Create a new category for your suppliers.'}
+              {editingType ? `Update the details for this ${isShopProfile ? 'shop' : 'supplier'} type.` : `Create a new category for your ${isShopProfile ? 'shops' : 'suppliers'}.`}
             </DialogDescription>
           </DialogHeader>
            <Form {...form}>
@@ -266,5 +269,3 @@ export function ManageSupplierTypes() {
     </>
   );
 }
-
-    

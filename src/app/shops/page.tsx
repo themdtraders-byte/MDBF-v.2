@@ -15,9 +15,6 @@ import { ManageSupplierTypes } from "@/components/suppliers/manage-supplier-type
 import { SwipeableTabs, SwipeableTabsCarousel, SwipeableTabsContent, SwipeableTabsList, SwipeableTabsTrigger } from "@/components/ui/swipeable-tabs";
 
 // Reusing supplier components as "Shops" for Home Profile
-// This is a pragmatic choice to avoid duplicating a lot of code.
-// The labels and database keys would be adjusted if this were a more permanent feature.
-
 const TABS = [
     { value: "shop-list", icon: Icons.supplierList, label: "Shop List" },
     { value: "add-shop", icon: Icons.addSupplier, label: "Add Shop" },
@@ -54,16 +51,16 @@ export default function ShopsPage() {
                         </SwipeableTabsList>
                         <SwipeableTabsCarousel value={activeTab} onValueChange={setActiveTab}>
                             <SwipeableTabsContent value="shop-list">
-                               <SupplierListTable />
+                               <SupplierListTable isShopProfile={true} />
                             </SwipeableTabsContent>
                             <SwipeableTabsContent value="add-shop">
-                               <AddSupplierForm onFinish={handleFinish} />
+                               <AddSupplierForm onFinish={handleFinish} isShopProfile={true} />
                             </SwipeableTabsContent>
                             <SwipeableTabsContent value="pending-payables">
-                                <PendingPayablesTable />
+                                <PendingPayablesTable isShopProfile={true} />
                             </SwipeableTabsContent>
                             <SwipeableTabsContent value="manage-types">
-                               <ManageSupplierTypes />
+                               <ManageSupplierTypes isShopProfile={true} />
                             </SwipeableTabsContent>
                         </SwipeableTabsCarousel>
                     </SwipeableTabs>
