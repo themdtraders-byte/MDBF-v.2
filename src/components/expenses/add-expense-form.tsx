@@ -207,6 +207,17 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
             currentCategories[categoryIndex].usageCount = (currentCategories[categoryIndex].usageCount || 0) + 1;
             await dbSave(dbKey, currentCategories);
         }
+
+        if (isHomeProfile && data.shopId && data.shopId !== 'none') {
+            const suppliers = await dbLoad("suppliers");
+            const supplierIndex = suppliers.findIndex(s => s.id === data.shopId);
+            if(supplierIndex > -1) {
+                // For a home expense, paying a shop reduces what you owe them (or increases your advance)
+                suppliers[supplierIndex].balance -= data.amount;
+                await dbSave("suppliers", suppliers);
+            }
+        }
+
       }
 
       await dbSave("expenses", existingExpenses);
@@ -363,7 +374,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem value="">None</SelectItem>
+                                    <SelectItem value="none">None</SelectItem>
                                     {shopOptions.map(shop => (
                                         <SelectItem key={shop.value} value={shop.value}>{shop.label}</SelectItem>
                                     ))}
