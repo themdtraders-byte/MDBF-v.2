@@ -358,7 +358,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem value="">None</SelectItem>
+                                    <SelectItem value="none">None</SelectItem>
                                     {shopOptions.map(shop => (
                                         <SelectItem key={shop.value} value={shop.value}>{shop.label}</SelectItem>
                                     ))}
