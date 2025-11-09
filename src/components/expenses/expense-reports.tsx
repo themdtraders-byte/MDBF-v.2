@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -38,6 +37,7 @@ import { ExpenseDetails } from "../expenses/expense-details";
 type Expense = {
     id: string;
     categoryId: string;
+    itemId?: string;
     amount: number;
     date: string;
     notes?: string;
@@ -45,7 +45,7 @@ type Expense = {
     attachments?: string[];
     paymentAccountId?: string;
 }
-type ExpenseCategory = { id: string; name: string; }
+type ExpenseCategory = { id: string; name: string; items?: {id: string; name: string}[] }
 type Account = { id: string; name: string; }
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
@@ -93,8 +93,15 @@ export function ExpenseReports() {
   }, [allExpenses, dateRange]);
 
   const getCategoryName = (categoryId: string) => {
-    return categories.find(c => c.id === categoryId)?.name || 'Uncategorized';
+    return categories.find(c => c.id === categoryId)?.name || t('uncategorized');
   }
+  
+  const getItemName = (categoryId: string, itemId?: string) => {
+    if (!itemId) return 'N/A';
+    const category = categories.find(c => c.id === categoryId);
+    return category?.items?.find(i => i.id === itemId)?.name || 'N/A';
+  }
+
   const getAccountName = (accountId: string) => {
     return accounts.find(a => a.id === accountId)?.name || 'N/A';
   }
@@ -131,7 +138,7 @@ export function ExpenseReports() {
     <Card>
       <CardHeader>
         <CardTitle>{t("expenseReports")}</CardTitle>
-        <CardDescription>A detailed breakdown of your expenses.</CardDescription>
+        <CardDescription>{t('salesReportDescription')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <Card>
@@ -157,8 +164,8 @@ export function ExpenseReports() {
             <CardHeader>
                  <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle>All Expenses</CardTitle>
-                        <CardDescription>A complete log of all your recorded expenses.</CardDescription>
+                        <CardTitle>{t('allExpensesTitle')}</CardTitle>
+                        <CardDescription>{t('allExpensesDescription')}</CardDescription>
                     </div>
                     <DateRangePicker date={dateRange} setDate={setDateRange} />
                 </div>
@@ -169,6 +176,7 @@ export function ExpenseReports() {
                         <TableRow>
                             <TableHead>{t('date')}</TableHead>
                             <TableHead>{t('category')}</TableHead>
+                            <TableHead>Item</TableHead>
                             <TableHead>{t('notesOptional')}</TableHead>
                             <TableHead className="text-right">{t('amount')}</TableHead>
                             <TableHead className="text-right">{t('actions')}</TableHead>
@@ -179,6 +187,7 @@ export function ExpenseReports() {
                             <TableRow key={expense.id}>
                                 <TableCell>{format(new Date(expense.date), "PPP")}</TableCell>
                                 <TableCell><Badge variant="outline">{getCategoryName(expense.categoryId)}</Badge></TableCell>
+                                <TableCell>{getItemName(expense.categoryId, expense.itemId)}</TableCell>
                                 <TableCell>{expense.notes || 'N/A'}</TableCell>
                                 <TableCell className="text-right font-semibold text-destructive">PKR {expense.amount.toFixed(2)}</TableCell>
                                 <TableCell className="text-right">
@@ -196,7 +205,7 @@ export function ExpenseReports() {
                         ))}
                         {expenses.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
+                                <TableCell colSpan={6} className="text-center h-24">
                                     No expenses recorded yet.
                                 </TableCell>
                             </TableRow>

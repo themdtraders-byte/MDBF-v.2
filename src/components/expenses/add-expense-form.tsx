@@ -38,6 +38,7 @@ import Image from "next/image";
 
 const formSchema = z.object({
   categoryId: z.string().min(1, "Expense category is required."),
+  itemId: z.string().optional(),
   date: z.date(),
   amount: z.number().min(0.01, "Amount must be greater than 0."),
   paymentAccountId: z.string().min(1, "Payment account is required."),
@@ -49,7 +50,7 @@ const formSchema = z.object({
 
 type ExpenseFormValues = z.infer<typeof formSchema>;
 type Account = { id: string; name: string; balance: number; usageCount?: number };
-type ExpenseCategory = { id: string; name: string; usageCount?: number };
+type ExpenseCategory = { id: string; name: string; usageCount?: number; items?: {id: string; name: string}[] };
 type Shop = { id: string; name: string };
 
 interface AddExpenseFormProps {
@@ -92,9 +93,8 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   }, []);
   
   const fetchShops = React.useCallback(async () => {
-    // Shops are only for home profile
     if (isHomeProfile) {
-      const storedShops: Shop[] = await dbLoad("suppliers"); // Shops are stored as suppliers
+      const storedShops: Shop[] = await dbLoad("suppliers");
       setShops(storedShops);
     }
   }, [isHomeProfile]);
@@ -103,7 +103,6 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   useEffect(() => {
     fetchAccounts();
     fetchCategories();
-    // fetchShops depends on isHomeProfile, which is set in fetchCategories
   }, [fetchAccounts, fetchCategories]);
 
   useEffect(() => {
@@ -119,6 +118,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
         reference: expenseToEdit.reference || '',
         attachments: expenseToEdit.attachments || [],
         shopId: expenseToEdit.shopId || '',
+        itemId: expenseToEdit.itemId || '',
     } : {
       date: new Date(),
       amount: 0,
@@ -126,6 +126,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
       reference: "",
       attachments: [],
       shopId: '',
+      itemId: '',
     },
   });
   
@@ -136,7 +137,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   }, [isEditMode, expenseToEdit, form]);
 
   const attachments = form.watch("attachments") || [];
-
+  const selectedCategoryId = form.watch("categoryId");
 
   const handleCreateCategory = async (categoryName: string) => {
     const dbKey = getCategoryDbKey();
@@ -145,6 +146,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
         id: `CAT-${Date.now()}`,
         name: categoryName,
         usageCount: 1,
+        items: []
     };
     existingCategories.push(newCategory);
     await dbSave(dbKey, existingCategories);
@@ -152,6 +154,30 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
     toast({ title: "Expense Category Created" });
     form.setValue('categoryId', newCategory.id);
   };
+  
+  const handleCreateItemForCategory = async (itemName: string) => {
+    if (!selectedCategoryId) return;
+    
+    const dbKey = getCategoryDbKey();
+    const existingCategories = await dbLoad(dbKey);
+    const categoryIndex = existingCategories.findIndex(c => c.id === selectedCategoryId);
+    
+    if (categoryIndex > -1) {
+        const category = existingCategories[categoryIndex];
+        const newItem = { id: `ITEM-${Date.now()}`, name: itemName };
+        
+        if (!category.items) {
+            category.items = [];
+        }
+        category.items.push(newItem);
+        
+        await dbSave(dbKey, existingCategories);
+        await fetchCategories(); // Refetch to update the state
+        form.setValue('itemId', newItem.id);
+        toast({ title: "Item Added", description: `"${itemName}" added to category.`});
+    }
+  }
+
 
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -212,7 +238,6 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
             const suppliers = await dbLoad("suppliers");
             const supplierIndex = suppliers.findIndex(s => s.id === data.shopId);
             if(supplierIndex > -1) {
-                // For a home expense, paying a shop reduces what you owe them (or increases your advance)
                 suppliers[supplierIndex].balance -= data.amount;
                 await dbSave("suppliers", suppliers);
             }
@@ -239,6 +264,7 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
             notes: "",
             attachments: [],
             shopId: '',
+            itemId: '',
         });
       }
     } catch (error) {
@@ -252,6 +278,9 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   
   const categoryOptions = expenseCategories.map(cat => ({ value: cat.id, label: cat.name }));
   const shopOptions = shops.map(shop => ({ value: shop.id, label: shop.name }));
+  const selectedCategory = expenseCategories.find(c => c.id === selectedCategoryId);
+  const itemOptionsForCategory = (selectedCategory?.items || []).map(item => ({ value: item.id, label: item.name }));
+
 
   return (
     <Card className={cn(isEditMode && "border-0 shadow-none")}>
@@ -271,7 +300,10 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                         <CreatableSelect
                           options={categoryOptions}
                           value={field.value}
-                          onChange={(value) => form.setValue('categoryId', value)}
+                          onChange={(value) => {
+                            form.setValue('categoryId', value);
+                            form.setValue('itemId', ''); // Reset item when category changes
+                          }}
                           onCreate={handleCreateCategory}
                           placeholder={t('selectCategory')}
                         />
@@ -279,7 +311,28 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                         </FormItem>
                     )}
                 />
-                <FormField
+                 {isHomeProfile && selectedCategoryId && (
+                    <FormField
+                        control={form.control}
+                        name="itemId"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Item (Optional)</FormLabel>
+                            <CreatableSelect
+                                options={itemOptionsForCategory}
+                                value={field.value || ""}
+                                onChange={(value) => form.setValue('itemId', value)}
+                                onCreate={handleCreateItemForCategory}
+                                placeholder="Select or create an item"
+                            />
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
+            </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <FormField
                     control={form.control}
                     name="date"
                     render={({ field }) => (
@@ -317,8 +370,6 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                         </FormItem>
                     )}
                 />
-            </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                     control={form.control}
                     name="amount"
@@ -337,6 +388,8 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                         </FormItem>
                     )}
                 />
+             </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <FormField
                     control={form.control}
                     name="paymentAccountId"
@@ -359,32 +412,32 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                         </FormItem>
                     )}
                 />
+                 {isHomeProfile && (
+                    <FormField
+                        control={form.control}
+                        name="shopId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Shop (Optional)</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a shop" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        {shopOptions.map(shop => (
+                                            <SelectItem key={shop.value} value={shop.value}>{shop.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
              </div>
-             {isHomeProfile && (
-                <FormField
-                    control={form.control}
-                    name="shopId"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Shop (Optional)</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ''}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a shop" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {shopOptions.map(shop => (
-                                        <SelectItem key={shop.value} value={shop.value}>{shop.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-             )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <FormField
                     control={form.control}

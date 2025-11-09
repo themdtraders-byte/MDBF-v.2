@@ -1,8 +1,10 @@
 
-
 "use client";
 
 import { useEffect, useState } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { useLanguage } from "@/hooks/use-language";
 import {
   Card,
@@ -10,6 +12,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from "@/components/ui/card";
 import {
   Table,
@@ -21,16 +24,25 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
-import { dbLoad, dbSave, dbClearAndSave } from "@/lib/db";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
-import { Input } from "../ui/input";
-import { ExpenseCategoryDetails } from "./expense-category-details";
-import { cn } from "@/lib/utils";
+import { dbLoad, dbSave, dbClearAndSave } from "@/lib/db";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,24 +54,35 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "../ui/label";
+import { X } from "lucide-react";
+import { Badge } from "../ui/badge";
+import { Separator } from "../ui/separator";
 
+
+const itemSchema = z.object({
+    id: z.string(),
+    name: z.string().min(1, "Item name cannot be empty."),
+});
+
+const typeSchema = z.object({
+  name: z.string().min(2, "Category name is required."),
+  description: z.string().optional(),
+  items: z.array(itemSchema).optional()
+});
+
+type TypeFormValues = z.infer<typeof typeSchema>;
+type ExpenseCategory = {
+    id: string;
+    name: string;
+    description?: string;
+    items?: { id: string; name: string }[];
+}
 
 type Expense = {
     id: string;
     categoryId: string;
     amount: number;
 }
-type ExpenseCategory = {
-    id: string;
-    name: string;
-    description?: string;
-}
-
-const typeSchema = z.object({
-  name: z.string().min(2, "Category name is required."),
-  description: z.string().optional(),
-});
-type TypeFormValues = z.infer<typeof typeSchema>;
 
 
 export function ExpenseCategoriesTable() {
@@ -69,13 +92,18 @@ export function ExpenseCategoriesTable() {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
-  const [viewingCategory, setViewingCategory] = useState<ExpenseCategory | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<ExpenseCategory | null>(null);
   const [deleteConfirmationCode, setDeleteConfirmationCode] = useState('');
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
+  const [isHomeProfile, setIsHomeProfile] = useState(false);
 
   const form = useForm<TypeFormValues>({
     resolver: zodResolver(typeSchema),
+  });
+
+   const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items",
   });
   
   const getCategoryDbKey = () => {
@@ -84,7 +112,9 @@ export function ExpenseCategoriesTable() {
     if (activeAccount) {
       try {
         const type = JSON.parse(activeAccount).type;
-        return type === 'Home' ? 'home-expense-categories' : 'business-expense-categories';
+        const isHome = type === 'Home';
+        setIsHomeProfile(isHome);
+        return isHome ? 'home-expense-categories' : 'business-expense-categories';
       } catch (e) {
         return 'business-expense-categories';
       }
@@ -112,7 +142,15 @@ export function ExpenseCategoriesTable() {
 
   const openDialog = (category: ExpenseCategory | null = null) => {
     setEditingCategory(category);
-    form.reset(category ? { name: category.name, description: category.description || '' } : { name: '', description: '' });
+    form.reset(category ? { 
+        name: category.name, 
+        description: category.description,
+        items: category.items || [],
+    } : { 
+        name: '', 
+        description: '',
+        items: [],
+    });
     setIsDialogOpen(true);
   }
   
@@ -145,6 +183,7 @@ export function ExpenseCategoriesTable() {
             id: `CAT-${Date.now()}`,
             name: data.name,
             description: data.description,
+            items: data.items || [],
         };
         currentCategories.push(newCategory);
     }
@@ -171,25 +210,33 @@ export function ExpenseCategoriesTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t('categoryName')}</TableHead>
-              <TableHead>{t('description')}</TableHead>
+              <TableHead>Category Name</TableHead>
+              <TableHead>Description</TableHead>
+              {isHomeProfile && <TableHead>Items</TableHead>}
               <TableHead className="text-right">{t('totalExpenses')}</TableHead>
               <TableHead className="text-right">{t('actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {categories.map((category) => (
-              <TableRow key={category.id} onClick={() => setViewingCategory(category)} className="cursor-pointer">
+              <TableRow key={category.id}>
                 <TableCell className="font-medium flex items-center gap-2">
                     {category.name}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{category.description}</TableCell>
+                {isHomeProfile && (
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {(category.items || []).map(item => <Badge key={item.id} variant="outline">{item.name}</Badge>)}
+                    </div>
+                  </TableCell>
+                )}
                 <TableCell className="text-right">PKR {getCategoryTotal(category.id).toFixed(2)}</TableCell>
                 <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDialog(category); }}>
+                    <Button variant="ghost" size="icon" onClick={() => openDialog(category)}>
                         <Icons.settings className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); openDeleteDialog(category);}}>
+                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => openDeleteDialog(category)}>
                         <Icons.trash className="h-4 w-4" />
                     </Button>
                 </TableCell>
@@ -197,7 +244,7 @@ export function ExpenseCategoriesTable() {
             ))}
              {categories.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center h-24">{t('noCategoriesFound')}</TableCell>
+                    <TableCell colSpan={isHomeProfile ? 5 : 4} className="text-center h-24">{t('noCategoriesFound')}</TableCell>
                 </TableRow>
             )}
           </TableBody>
@@ -205,10 +252,13 @@ export function ExpenseCategoriesTable() {
       </CardContent>
     </Card>
 
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingCategory ? 'Edit' : 'Add'} Expense Category</DialogTitle>
+            <DialogDescription>
+              {editingCategory ? 'Update the details for this expense category.' : 'Create a new category for your expenses.'}
+            </DialogDescription>
           </DialogHeader>
            <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
@@ -238,19 +288,34 @@ export function ExpenseCategoriesTable() {
                     </FormItem>
                 )}
                 />
+                {isHomeProfile && (
+                    <div className="space-y-4 rounded-lg border p-4">
+                        <h4 className="font-medium">Category Items</h4>
+                         {fields.map((field, index) => (
+                           <div key={field.id} className="flex items-center gap-2">
+                                <FormField
+                                    control={form.control}
+                                    name={`items.${index}.name`}
+                                    render={({ field }) => (
+                                        <Input {...field} placeholder={`Item ${index + 1} name`} />
+                                    )}
+                                />
+                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                           </div>
+                         ))}
+                         <Button type="button" variant="outline" size="sm" onClick={() => append({ id: `item-${Date.now()}`, name: '' })}>
+                           <Icons.plus className="mr-2 h-4 w-4" />
+                           Add Item
+                         </Button>
+                    </div>
+                )}
                 <DialogFooter>
                     <Button type="submit">{editingCategory ? t('saveChanges') : t('createCategory')}</Button>
                 </DialogFooter>
             </form>
            </Form>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={!!viewingCategory} onOpenChange={(open) => !open && setViewingCategory(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[90vw]">
-            <DialogHeader>
-                <DialogTitle>{t('detailsFor')} {viewingCategory?.name}</DialogTitle>
-            </DialogHeader>
-            {viewingCategory && <ExpenseCategoryDetails categoryId={viewingCategory.id} onDataChange={fetchData} />}
         </DialogContent>
       </Dialog>
       <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>

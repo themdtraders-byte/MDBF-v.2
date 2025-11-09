@@ -7,11 +7,12 @@ import { Invoice } from "../ui/invoice";
 
 type Account = { id: string; name: string };
 type BusinessProfile = { businessName: string, address: string, phone: string, [key: string]: any; };
-type ExpenseCategory = { id: string, name: string };
+type ExpenseCategory = { id: string; name: string; items?: {id: string; name: string}[] };
 
 type Expense = {
     id: string;
     categoryId: string;
+    itemId?: string;
     date: string;
     amount: number;
     paymentAccountId?: string;
@@ -58,10 +59,17 @@ export function ExpenseDetails({ expense }: ExpenseDetailsProps) {
     }, [expense]);
 
     
+    const getItemName = (categoryId: string, itemId?: string) => {
+        if (!itemId || !category) return '';
+        return category.items?.find(i => i.id === itemId)?.name || '';
+    }
+
+    const itemName = getItemName(expense.categoryId, expense.itemId);
+    
     const tableHeaders = ['Description', 'Category', 'Amount'];
     const tableRows = [
         [
-            expense.notes || 'General Expense',
+            `${itemName ? `${itemName} - ` : ''}${expense.notes || 'General Expense'}`,
             category?.name || 'Uncategorized',
             `PKR ${expense.amount.toFixed(2)}`
         ]
