@@ -92,8 +92,9 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   }, []);
   
   const fetchShops = React.useCallback(async () => {
+    // Shops are only for home profile
     if (isHomeProfile) {
-      const storedShops: Shop[] = await dbLoad("shops");
+      const storedShops: Shop[] = await dbLoad("suppliers"); // Shops are stored as suppliers
       setShops(storedShops);
     }
   }, [isHomeProfile]);
@@ -102,8 +103,12 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
   useEffect(() => {
     fetchAccounts();
     fetchCategories();
+    // fetchShops depends on isHomeProfile, which is set in fetchCategories
+  }, [fetchAccounts, fetchCategories]);
+
+  useEffect(() => {
     fetchShops();
-  }, [fetchAccounts, fetchCategories, fetchShops]);
+  }, [fetchShops]);
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(formSchema),
@@ -351,14 +356,14 @@ export function AddExpenseForm({ expenseToEdit, onFinish }: AddExpenseFormProps)
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Shop (Optional)</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value || ''}>
                                 <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a shop" />
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
+                                    <SelectItem value="">None</SelectItem>
                                     {shopOptions.map(shop => (
                                         <SelectItem key={shop.value} value={shop.value}>{shop.label}</SelectItem>
                                     ))}
