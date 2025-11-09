@@ -26,17 +26,21 @@ type Supplier = {
 }
 type BusinessProfile = { businessName: string, address: string, phone: string, [key: string]: any; };
 type Purchase = { supplierId: string, billNumber: string, purchaseDate: string, grandTotal: number, amountPaid: number, items: { itemId: string, quantity: number }[] };
+type Expense = { shopId: string, id: string, date: string, totalBill: number, amountPaid: number, notes?: string, categoryId: string, itemId?: string };
 type InventoryItem = { id: string; name: string };
+type ExpenseCategory = { id: string; name: string; items?: { id: string; name: string; }[] };
 interface RowRange { start: number | null; end: number | null; }
 
 interface SupplierDetailsProps {
     supplier: Supplier;
+    isShopProfile?: boolean;
 }
 
-export function SupplierDetails({ supplier }: SupplierDetailsProps) {
+export function SupplierDetails({ supplier, isShopProfile = false }: SupplierDetailsProps) {
     const { t } = useLanguage();
     const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
+    const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [allTransactions, setAllTransactions] = useState<any[]>([]);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [rowRange, setRowRange] = useState<RowRange>({ start: null, end: null });
@@ -53,41 +57,59 @@ export function SupplierDetails({ supplier }: SupplierDetailsProps) {
             const inventoryItems: InventoryItem[] = await dbLoad("inventory");
             setInventory(inventoryItems);
 
-            const purchases: Purchase[] = (await dbLoad("purchases")).filter(p => p.supplierId === supplier.id);
-            
-            const getItemSummary = (items: { itemId: string, quantity: number }[] = []) => {
-                return items.map(item => {
-                    const itemName = inventoryItems.find(inv => inv.id === item.itemId)?.name || 'Item';
-                    return `${itemName} (x${item.quantity})`;
-                }).join(', ');
-            };
+            if (isShopProfile) {
+                const homeCategories: ExpenseCategory[] = await dbLoad("home-expense-categories");
+                setExpenseCategories(homeCategories);
+                const expenses: Expense[] = (await dbLoad("expenses")).filter(e => e.shopId === supplier.id);
 
-            const formattedPurchases = purchases.flatMap(p => {
-                 const purchaseDescription = `Purchase #${p.billNumber}: ${getItemSummary(p.items)}`;
-                 let transactions = [];
-                 if (p.grandTotal > 0) {
-                     transactions.push({
-                         date: p.purchaseDate,
-                         description: purchaseDescription,
-                         debit: 0,
-                         credit: p.grandTotal,
-                     });
-                 }
-                 if (p.amountPaid > 0) {
-                      transactions.push({
-                         date: p.purchaseDate,
-                         description: `Payment for #${p.billNumber}`,
-                         debit: p.amountPaid,
-                         credit: 0
-                     });
-                 }
-                 return transactions;
-            });
+                const getExpenseDescription = (expense: Expense) => {
+                    const category = homeCategories.find(c => c.id === expense.categoryId);
+                    const item = category?.items?.find(i => i.id === expense.itemId);
+                    let desc = category?.name || "Expense";
+                    if (item) desc += ` - ${item.name}`;
+                    if (expense.notes) desc += ` (${expense.notes})`;
+                    return desc;
+                }
 
-            setAllTransactions(formattedPurchases);
+                const formattedExpenses = expenses.flatMap(e => {
+                    const expenseDescription = getExpenseDescription(e);
+                    let transactions = [];
+                    if (e.totalBill > 0) {
+                        transactions.push({ date: e.date, description: expenseDescription, debit: 0, credit: e.totalBill });
+                    }
+                    if (e.amountPaid > 0) {
+                        transactions.push({ date: e.date, description: `Payment for Expense #${e.id.slice(-5)}`, debit: e.amountPaid, credit: 0 });
+                    }
+                    return transactions;
+                });
+                 setAllTransactions(formattedExpenses);
+
+            } else {
+                const purchases: Purchase[] = (await dbLoad("purchases")).filter(p => p.supplierId === supplier.id);
+                
+                const getItemSummary = (items: { itemId: string, quantity: number }[] = []) => {
+                    return items.map(item => {
+                        const itemName = inventoryItems.find(inv => inv.id === item.itemId)?.name || 'Item';
+                        return `${itemName} (x${item.quantity})`;
+                    }).join(', ');
+                };
+
+                const formattedPurchases = purchases.flatMap(p => {
+                     const purchaseDescription = `Purchase #${p.billNumber}: ${getItemSummary(p.items)}`;
+                     let transactions = [];
+                     if (p.grandTotal > 0) {
+                         transactions.push({ date: p.purchaseDate, description: purchaseDescription, debit: 0, credit: p.grandTotal });
+                     }
+                     if (p.amountPaid > 0) {
+                          transactions.push({ date: p.purchaseDate, description: `Payment for #${p.billNumber}`, debit: p.amountPaid, credit: 0 });
+                     }
+                     return transactions;
+                });
+                setAllTransactions(formattedPurchases);
+            }
         }
         fetchData();
-    }, [supplier.id]);
+    }, [supplier.id, isShopProfile]);
     
     const transactions = React.useMemo(() => {
         if (!dateRange?.from) return allTransactions;
@@ -158,23 +180,27 @@ export function SupplierDetails({ supplier }: SupplierDetailsProps) {
     const summaryDetails = [
       { label: "Closing Balance:", value: `PKR ${runningBalance.toFixed(2)}`, isBalance: true, className: runningBalance > 0 ? "text-destructive" : "text-green-600" },
     ];
+    
+    const partyType = isShopProfile ? "Shop" : "Supplier";
+    const title = isShopProfile ? "shopLedger" : "supplierLedger";
+    const refType = isShopProfile ? "shopId" : "supplierId";
 
     return (
         <div>
             <Invoice
-                title="supplierLedger"
+                title={title}
                 businessProfile={businessProfile}
                 party={{
                     name: supplier.name,
                     address: supplier.address,
                     contact: supplier.contact,
                     photo: supplier.photo,
-                    type: "Supplier"
+                    type: partyType
                 }}
                 reference={{
                     number: supplier.id,
                     date: new Date().toISOString(),
-                    type: t('supplierId')
+                    type: t(refType as keyof any, { defaultValue: refType })
                 }}
                 table={{
                     headers: tableHeaders,

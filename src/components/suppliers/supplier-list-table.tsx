@@ -269,7 +269,7 @@ export function SupplierListTable({ isShopProfile = false }: SupplierListTablePr
             <DialogHeader>
                 <DialogTitle>{isShopProfile ? 'Shop' : 'Supplier'} Details</DialogTitle>
             </DialogHeader>
-            {viewingSupplier && <SupplierDetails supplier={viewingSupplier} />}
+            {viewingSupplier && <SupplierDetails supplier={viewingSupplier} isShopProfile={isShopProfile} />}
         </DialogContent>
     </Dialog>
 
